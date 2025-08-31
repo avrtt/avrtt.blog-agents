@@ -51,3 +51,7 @@ Thumbs.db
 *.tmp
 *.temp
 event.json
+
+# Context & metadata
+building_an_ai_agent.mdx
+starter-prompt.txt

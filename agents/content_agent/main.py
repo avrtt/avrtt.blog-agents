@@ -29,8 +29,18 @@ def create_outline(topic):
 ---
 *Generated in dry-run mode*"""
     
-    # TODO: Implement LLM outline generation
-    return f"# Outline for: {topic}"
+    try:
+        from langchain_openai import ChatOpenAI
+        from .prompts import OUTLINE_GENERATION_PROMPT
+        
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        prompt = OUTLINE_GENERATION_PROMPT.format(topic=topic)
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        return response.content
+    except Exception as e:
+        print(f"Error generating outline: {e}")
+        return f"# Outline for: {topic}"
 
 def expand_draft(outline, sources=None):
     """Expand outline into full draft"""
@@ -46,8 +56,26 @@ This is a placeholder draft. Set OPENAI_API_KEY to enable full content generatio
 ---
 *Generated in dry-run mode*"""
     
-    # TODO: Implement LLM draft expansion
-    return outline
+    try:
+        from langchain_openai import ChatOpenAI
+        from .prompts import DRAFT_EXPANSION_PROMPT
+        
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        
+        additional_context = ""
+        if sources:
+            additional_context = f"\n## Sources:\n{sources}"
+        
+        prompt = DRAFT_EXPANSION_PROMPT.format(
+            outline=outline,
+            additional_context=additional_context
+        )
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        return response.content
+    except Exception as e:
+        print(f"Error expanding draft: {e}")
+        return outline
 
 def self_critique(draft):
     """Self-critique the draft"""
@@ -62,12 +90,23 @@ def self_critique(draft):
 ---
 *Generated in dry-run mode*"""
     
-    # TODO: Implement LLM self-critique
-    return "Self-critique would be generated here"
+    try:
+        from langchain_openai import ChatOpenAI
+        from .prompts import SELF_CRITIQUE_PROMPT
+        
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+        prompt = SELF_CRITIQUE_PROMPT.format(content=draft[:3000])  # Limit content length
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        return response.content
+    except Exception as e:
+        print(f"Error generating critique: {e}")
+        return "Self-critique would be generated here"
 
 def seo_checklist(draft):
     """Generate SEO checklist"""
-    return """## SEO Checklist
+    if not os.getenv("OPENAI_API_KEY"):
+        return """## SEO Checklist
 
 - [ ] Title is compelling (50-60 chars)
 - [ ] Meta description is descriptive (150-160 chars)
@@ -80,6 +119,56 @@ def seo_checklist(draft):
 
 ---
 *Generated in dry-run mode*"""
+    
+    try:
+        from langchain_openai import ChatOpenAI
+        from .prompts import SEO_CHECKLIST_PROMPT
+        
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+        prompt = SEO_CHECKLIST_PROMPT.format(content=draft[:3000])  # Limit content length
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        return response.content
+    except Exception as e:
+        print(f"Error generating SEO checklist: {e}")
+        return "SEO checklist would be generated here"
+
+def generate_social_snippets(draft):
+    """Generate social media snippets"""
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "telegram": f"📝 New blog post: {draft.split()[1] if draft.startswith('#') else 'Check out our latest post!'}",
+            "facebook": f"New blog post: {draft.split()[1] if draft.startswith('#') else 'Check out our latest post!'}",
+            "twitter": f"New blog post: {draft.split()[1] if draft.startswith('#') else 'Check out our latest post!'} #blog #tech"
+        }
+    
+    try:
+        from langchain_openai import ChatOpenAI
+        from .prompts import SOCIAL_MEDIA_PROMPT
+        import json
+        
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
+        prompt = SOCIAL_MEDIA_PROMPT.format(content=draft[:2000])  # Limit content length
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        
+        # Try to parse JSON response
+        try:
+            return json.loads(response.content)
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return {
+                "telegram": response.content[:300],
+                "facebook": response.content[:280],
+                "twitter": response.content[:280]
+            }
+    except Exception as e:
+        print(f"Error generating social snippets: {e}")
+        return {
+            "telegram": "Social media snippet generation failed",
+            "facebook": "Social media snippet generation failed",
+            "twitter": "Social media snippet generation failed"
+        }
 
 def main():
     if len(sys.argv) < 2:
@@ -102,9 +191,10 @@ def main():
     # Expand to draft
     draft = expand_draft(outline)
     
-    # Generate critique and SEO checklist
+    # Generate critique, SEO checklist, and social snippets
     critique = self_critique(draft)
     seo = seo_checklist(draft)
+    social = generate_social_snippets(draft)
     
     # Save outputs
     output_dir = Path("out")
@@ -115,8 +205,12 @@ def main():
     (output_dir / f"draft-{timestamp}.md").write_text(draft, encoding="utf-8")
     (output_dir / f"critique-{timestamp}.md").write_text(critique, encoding="utf-8")
     (output_dir / f"seo-{timestamp}.md").write_text(seo, encoding="utf-8")
+    (output_dir / f"social-{timestamp}.json").write_text(
+        json.dumps(social, ensure_ascii=False, indent=2), 
+        encoding="utf-8"
+    )
     
-    print(f"Generated draft, critique, and SEO checklist in out/")
+    print(f"✅ Generated draft, critique, SEO checklist, and social snippets in out/")
 
 if __name__ == "__main__":
     import datetime

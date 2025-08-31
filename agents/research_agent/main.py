@@ -41,6 +41,39 @@ def call_llm_system(prompt):
 
 def main():
     topic = " ".join(sys.argv[1:]) or "Auto-generated topic"
+    
+    # Try LangGraph workflow first
+    try:
+        from .langgraph_agent import run_research_workflow
+        result = run_research_workflow(topic)
+        
+        if result["status"] == "completed" and result["method"] == "langgraph":
+            state = result["state"]
+            
+            # Save outputs
+            ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M")
+            (OUT / f"draft-{ts}.md").write_text(state.draft, encoding="utf-8")
+            
+            # Save sources
+            sources_data = []
+            for source in state.sources:
+                sources_data.append({
+                    "url": source["url"],
+                    "title": source["title"],
+                    "excerpt": source["content"][:2000]
+                })
+            
+            (OUT / f"sources-{ts}.json").write_text(
+                json.dumps(sources_data, ensure_ascii=False, indent=2), 
+                encoding="utf-8"
+            )
+            
+            print(f"✅ LangGraph workflow completed. Wrote draft and sources to out/")
+            return
+    except Exception as e:
+        print(f"LangGraph workflow failed: {e}, falling back to simple workflow")
+    
+    # Fallback to simple workflow
     hits = search_tavily(topic)
     notes = []
     for h in hits[:5]:
@@ -51,7 +84,7 @@ def main():
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M")
     (OUT / f"draft-{ts}.md").write_text(draft, encoding="utf-8")
     (OUT / f"sources-{ts}.json").write_text(json.dumps(notes, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("Wrote draft and sources to out/")
+    print("✅ Simple workflow completed. Wrote draft and sources to out/")
 
 if __name__ == "__main__":
     main()
