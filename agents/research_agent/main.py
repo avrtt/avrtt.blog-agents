@@ -48,7 +48,7 @@ def main():
         notes.append({"url": h["url"], "title": h.get("title"), "excerpt": txt[:2000]})
     prompt = f"Topic: {topic}\n\nSources:\n" + "\n\n".join([f"- {n['url']}: {n['excerpt'][:300]}" for n in notes])
     draft = call_llm_system(prompt)
-    ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M")
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M")
     (OUT / f"draft-{ts}.md").write_text(draft, encoding="utf-8")
     (OUT / f"sources-{ts}.json").write_text(json.dumps(notes, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Wrote draft and sources to out/")

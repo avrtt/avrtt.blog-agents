@@ -121,7 +121,7 @@ def main():
     output_dir = Path("out")
     output_dir.mkdir(exist_ok=True)
     
-    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M")
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M")
     
     output_data = {
         "metadata": metadata,
