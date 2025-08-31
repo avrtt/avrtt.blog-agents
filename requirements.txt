@@ -7,3 +7,6 @@ python-dotenv
 pydantic
 requests
 rich
+lancedb
+sentence-transformers
+numpy

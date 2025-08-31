@@ -31,6 +31,16 @@ run-smm:
 	fi
 	python -m agents.smm_agent.main "$(POST)"
 
+vector-search:
+	@if [ -z "$(QUERY)" ]; then \
+		echo "Usage: make vector-search QUERY=\"search query\""; \
+		exit 1; \
+	fi
+	python -m agents.vector_search.cli search --query "$(QUERY)"
+
+vector-stats:
+	python -m agents.vector_search.cli stats
+
 clean:
 	rm -rf out/* logs/*
 	@echo "Cleaned output and log directories"

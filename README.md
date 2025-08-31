@@ -127,6 +127,21 @@ python -m agents.smm_agent.main "post.md"
 - Facebook Pages
 - Twitter/X
 
+### Vector Search
+
+Search through stored posts and sources:
+
+```bash
+# Search sources
+make vector-search QUERY="AI automation"
+
+# Check database stats
+make vector-stats
+
+# Direct CLI usage
+python -m agents.vector_search.cli search --query "your query" --type sources
+```
+
 ## GitHub Actions
 
 ### Research → Blog PR

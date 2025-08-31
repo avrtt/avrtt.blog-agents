@@ -68,6 +68,22 @@ def main():
                 encoding="utf-8"
             )
             
+            # Store in vector database
+            try:
+                from ..vector_search.lancedb_client import vector_client
+                for i, source in enumerate(state.sources):
+                    source_id = f"{ts}-source-{i}"
+                    vector_client.add_source(
+                        source_id=source_id,
+                        url=source["url"],
+                        title=source["title"],
+                        content=source["content"],
+                        metadata={"topic": topic, "timestamp": ts}
+                    )
+                print(f"📊 Stored {len(state.sources)} sources in vector database")
+            except Exception as e:
+                print(f"Warning: Could not store in vector database: {e}")
+            
             print(f"✅ LangGraph workflow completed. Wrote draft and sources to out/")
             return
     except Exception as e:
@@ -84,6 +100,23 @@ def main():
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M")
     (OUT / f"draft-{ts}.md").write_text(draft, encoding="utf-8")
     (OUT / f"sources-{ts}.json").write_text(json.dumps(notes, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    # Store in vector database
+    try:
+        from ..vector_search.lancedb_client import vector_client
+        for i, note in enumerate(notes):
+            source_id = f"{ts}-source-{i}"
+            vector_client.add_source(
+                source_id=source_id,
+                url=note["url"],
+                title=note["title"],
+                content=note["excerpt"],
+                metadata={"topic": topic, "timestamp": ts}
+            )
+        print(f"📊 Stored {len(notes)} sources in vector database")
+    except Exception as e:
+        print(f"Warning: Could not store in vector database: {e}")
+    
     print("✅ Simple workflow completed. Wrote draft and sources to out/")
 
 if __name__ == "__main__":
