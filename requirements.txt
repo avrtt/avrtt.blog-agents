@@ -1,0 +1,9 @@
+langchain
+openai
+langgraph
+trafilatura
+PyGithub
+python-dotenv
+pydantic
+requests
+rich
