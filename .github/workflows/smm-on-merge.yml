@@ -1,0 +1,73 @@
+name: SMM on Post Merge
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - 'content/posts/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'content/posts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  smm-post:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Find changed posts
+        id: find-posts
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Get files changed in PR
+            git fetch origin ${{ github.event.pull_request.base.sha }}
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep 'content/posts/.*\.md$' || true)
+          else
+            # Get files changed in push
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep 'content/posts/.*\.md$' || true)
+          fi
+          
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "posts=$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "Found changed posts: $CHANGED_FILES"
+          else
+            echo "No post files changed"
+          fi
+
+      - name: Run SMM Agent for each post
+        if: steps.find-posts.outputs.posts != ''
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          X_API_TOKEN: ${{ secrets.X_API_TOKEN }}
+        run: |
+          for post_file in ${{ steps.find-posts.outputs.posts }}; do
+            echo "Processing SMM for: $post_file"
+            python -m agents.smm_agent.main "$post_file"
+          done
+
+      - name: Upload SMM results
+        if: steps.find-posts.outputs.posts != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: smm-results
+          path: out/smm-*.json
+          retention-days: 7

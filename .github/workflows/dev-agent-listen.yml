@@ -1,0 +1,46 @@
+name: Dev Agent Listener
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+  pull_request:
+    types: [opened, edited, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  dev-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Dev Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Export event data for the agent
+          echo "${{ toJSON(github.event) }}" > event.json
+          
+          # Run dev agent with event context
+          python -m agents.dev_agent.main
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-agent-results
+          path: out/dev-*.json
+          retention-days: 7

@@ -1,0 +1,91 @@
+name: Research → Blog PR
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Research topic"
+        required: true
+        default: "AI and automation trends"
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 8 AM UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Research Agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TAVILY_ENDPOINT: ${{ secrets.TAVILY_ENDPOINT }}
+        run: |
+          python -m agents.research_agent.main "${{ github.event.inputs.topic || 'Auto topic of the week' }}"
+
+      - name: Clone blog repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.BLOG_REPO }}
+          path: blog
+          token: ${{ secrets.BLOG_PAT }}
+
+      - name: Copy draft and create PR
+        run: |
+          # Find the latest draft file
+          DRAFT_FILE=$(ls -t out/draft-*.md | head -1)
+          if [ -z "$DRAFT_FILE" ]; then
+            echo "No draft file found"
+            exit 1
+          fi
+          
+          # Generate filename for blog
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          BLOG_FILENAME="research-${TIMESTAMP}.md"
+          
+          # Copy to blog repo
+          cp "$DRAFT_FILE" "blog/content/posts/${BLOG_FILENAME}"
+          
+          # Setup git in blog repo
+          cd blog
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          
+          # Create branch and commit
+          BRANCH_NAME="chore/research-draft-$(date -u +%s)"
+          git checkout -b "$BRANCH_NAME"
+          git add "content/posts/${BLOG_FILENAME}"
+          git commit -m "chore(blog): add research draft - ${{ github.event.inputs.topic || 'Auto topic' }}"
+          git push origin "$BRANCH_NAME"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.BLOG_PAT }}
+          repository: ${{ secrets.BLOG_REPO }}
+          branch: ${{ steps.blog-setup.outputs.branch }}
+          title: "Research draft - ${{ github.event.inputs.topic || 'Auto topic' }}"
+          body: |
+            Auto-generated research draft.
+            
+            **Topic:** ${{ github.event.inputs.topic || 'Auto topic of the week' }}
+            **Generated:** ${{ github.event.head_commit.timestamp || 'Unknown' }}
+            
+            Please review and edit before publishing.
+          commit-message: "chore(blog): add research draft"
+          delete-branch: true
